@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Data;
-using MySql.Data.MySqlClient; 
-using API_Users_Management.Resources;
+using MySql.Data.MySqlClient;
 
 namespace MaxiUsers.Resource
 {
@@ -10,26 +8,18 @@ namespace MaxiUsers.Resource
     {
         public static string connectionString = "Server=localhost;Port=3306;Database=maxiusers;Uid=root;Pwd=valentina;";
 
-        public static DataTable List(string storedProcedureName, List<Parameter> parameters = null)
+        public static DataTable List(string query)
         {
-            MySqlConnection connection = new MySqlConnection(connectionString); 
+            MySqlConnection connection = new MySqlConnection(connectionString);
 
             try
             {
                 connection.Open();
-                MySqlCommand cmd = new MySqlCommand(storedProcedureName, connection); 
-                cmd.CommandType = CommandType.StoredProcedure;
-
-                if (parameters != null)
-                {
-                    foreach (var parameter in parameters)
-                    {
-                        cmd.Parameters.AddWithValue(parameter.Name, parameter.Value);
-                    }
-                }
+                MySqlCommand cmd = new MySqlCommand(query, connection);
+                cmd.CommandType = CommandType.Text;
 
                 DataTable table = new DataTable();
-                MySqlDataAdapter da = new MySqlDataAdapter(cmd); 
+                MySqlDataAdapter da = new MySqlDataAdapter(cmd);
                 da.Fill(table);
 
                 return table;
@@ -44,27 +34,19 @@ namespace MaxiUsers.Resource
                 connection.Close();
             }
         }
-        
-         public static bool Update(string storedProcedureName, List<Parameter> parameters)
-        {  
+
+        public static bool Update(string query)
+        {
             MySqlConnection connection = new MySqlConnection(connectionString);
 
             try
             {
                 connection.Open();
-                MySqlCommand cmd = new MySqlCommand(storedProcedureName, connection);
-                cmd.CommandType = CommandType.StoredProcedure;
-
-                if (parameters != null)
-                {
-                    foreach (var parameter in parameters)
-                    {
-                        cmd.Parameters.AddWithValue(parameter.Name, parameter.Value);
-                    }
-                }
+                MySqlCommand cmd = new MySqlCommand(query, connection);
+                cmd.CommandType = CommandType.Text;
 
                 int rowsAffected = cmd.ExecuteNonQuery();
-                return rowsAffected > 0; 
+                return rowsAffected > 0;
             }
             catch (Exception ex)
             {
@@ -77,26 +59,18 @@ namespace MaxiUsers.Resource
             }
         }
 
-        public static bool Create(string storedProcedureName, List<Parameter> parameters)
+        public static bool Create(string query)
         {
             MySqlConnection connection = new MySqlConnection(connectionString);
 
             try
             {
                 connection.Open();
-                MySqlCommand cmd = new MySqlCommand(storedProcedureName, connection);
-                cmd.CommandType = CommandType.StoredProcedure;
-
-                if (parameters != null)
-                {
-                    foreach (var parameter in parameters)
-                    {
-                        cmd.Parameters.AddWithValue(parameter.Name, parameter.Value);
-                    }
-                }
+                MySqlCommand cmd = new MySqlCommand(query, connection);
+                cmd.CommandType = CommandType.Text;
 
                 int rowsAffected = cmd.ExecuteNonQuery();
-                return rowsAffected > 0; 
+                return rowsAffected > 0;
             }
             catch (Exception ex)
             {
@@ -109,26 +83,18 @@ namespace MaxiUsers.Resource
             }
         }
 
-        public static bool Delete(string storedProcedureName, List<Parameter> parameters)
+        public static bool Delete(string query)
         {
             MySqlConnection connection = new MySqlConnection(connectionString);
 
             try
             {
                 connection.Open();
-                MySqlCommand cmd = new MySqlCommand(storedProcedureName, connection);
-                cmd.CommandType = CommandType.StoredProcedure;
-
-                if (parameters != null)
-                {
-                    foreach (var parameter in parameters)
-                    {
-                        cmd.Parameters.AddWithValue(parameter.Name, parameter.Value);
-                    }
-                }
+                MySqlCommand cmd = new MySqlCommand(query, connection);
+                cmd.CommandType = CommandType.Text;
 
                 int rowsAffected = cmd.ExecuteNonQuery();
-                return rowsAffected > 0; 
+                return rowsAffected > 0;
             }
             catch (Exception ex)
             {

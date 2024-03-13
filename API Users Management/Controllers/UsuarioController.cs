@@ -2,9 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using Microsoft.AspNetCore.Mvc;
+using MySql.Data.MySqlClient;
 using Newtonsoft.Json;
-using API_Users_Management.Resources;
-using MaxiUsers.Resource;
 
 namespace API_Users_Management.Controllers
 {
@@ -12,69 +11,105 @@ namespace API_Users_Management.Controllers
     [Route("api")]
     public class UserController : ControllerBase
     {
+        public static string connectionString = "Server=localhost;Port=3306;Database=maxiusers;Uid=root;Pwd=valentina;";
+
         [HttpGet]
         [Route("users")]
         public IActionResult ListUsers()
         {
-            List<Parameter> parameters = new List<Parameter>();
-
-            DataTable users = DbData.List("GetAllUsers", parameters);
-            
-            if (users != null)
+            using (MySqlConnection connection = new MySqlConnection(connectionString))
             {
-                var userList = new List<object>();
-                foreach (DataRow row in users.Rows)
-                {    
-                    var user = new
+                try
+                {
+                    connection.Open();
+                    string query = "SELECT * FROM maxiusers.person";
+                    MySqlCommand cmd = new MySqlCommand(query, connection);
+                    DataTable users = new DataTable();
+                    MySqlDataAdapter da = new MySqlDataAdapter(cmd);
+                    da.Fill(users);
+
+                    if (users.Rows.Count > 0)
                     {
-                        Id_person = row["Id_person"],
-                        Id_type = row["type_user_Id_type_user"], // Aqu√≠ accede al tipo de usuario correcto
-                        Name = row["Name"],
-                        Address = row["Address"],
-                        Mail = row["Mail"]
-                    };
-                    userList.Add(user);
+                        var userList = new List<object>();
+                        foreach (DataRow row in users.Rows)
+                        {
+                            var user = new
+                            {
+                                Id_person = row["Id_person"],
+                                Id_type = row["type_user_Id_type_user"],
+                                Name = row["Name"],
+                                Address = row["Address"],
+                                Mail = row["Mail"],
+                                UserName = row["UserName"],
+                                Password = row["Password"],
+                                Age = row["Age"],
+                                Img = row["Img"] != DBNull.Value ? Convert.ToBase64String((byte[])row["Img"]) : null  // Convertir bytes a Base64 si no es nulo
+                            };
+                            userList.Add(user);
+                        }
+
+                        string jsonUsers = JsonConvert.SerializeObject(userList);
+
+                        return Ok(jsonUsers);
+                    }
+                    else
+                    {
+                        return NotFound("No users found");
+                    }
                 }
-
-                string jsonUsers = JsonConvert.SerializeObject(userList);
-
-                return Ok(jsonUsers); 
-            }
-            else
-            {
-                return StatusCode(500, "Error retrieving users"); 
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error in ListUsers: " + ex.Message);
+                    return StatusCode(500, "Error retrieving users");
+                }
             }
         }
-
 
         [HttpGet]
         [Route("users/{id}")]
         public IActionResult GetUserById(int id)
         {
-            Console.WriteLine("Received ID: " + id);
-
-            Parameter idParameter = new Parameter("p_Id_person", id.ToString());
-            List<Parameter> parameters = new List<Parameter>() { idParameter };
-            DataTable user = DbData.List("ReadUserById", parameters);
-
-            if (user != null && user.Rows.Count > 0)
+            using (MySqlConnection connection = new MySqlConnection(connectionString))
             {
-                var foundUser = new
+                try
                 {
-                    Id_person = user.Rows[0]["Id_person"],
-                    Id_type = user.Rows[0]["type_user_Id_type_user"],
-                    Name = user.Rows[0]["Name"],
-                    Address = user.Rows[0]["Address"],
-                    Mail = user.Rows[0]["Mail"]
-                };
+                    connection.Open();
+                    string query = $"SELECT * FROM maxiusers.person WHERE Id_person = {id}";
+                    MySqlCommand cmd = new MySqlCommand(query, connection);
+                    DataTable userTable = new DataTable();
+                    MySqlDataAdapter da = new MySqlDataAdapter(cmd);
+                    da.Fill(userTable);
 
-                string jsonUser = JsonConvert.SerializeObject(foundUser);
+                    if (userTable.Rows.Count > 0)
+                    {
+                        DataRow row = userTable.Rows[0];
+                        var foundUser = new
+                        {
+                            Id_person = row["Id_person"],
+                            Id_type = row["type_user_Id_type_user"],
+                            Name = row["Name"],
+                            Address = row["Address"],
+                            Mail = row["Mail"],
+                            UserName = row["UserName"],
+                            Password = row["Password"],
+                            Age = row["Age"],
+                            Img = row["Img"] != DBNull.Value ? Convert.ToBase64String((byte[])row["Img"]) : null // Convertir bytes a Base64 si la imagen no es nula
+                        };
 
-                return Ok(jsonUser);
-            }
-            else
-            {
-                return NotFound("User not found");
+                        string jsonUser = JsonConvert.SerializeObject(foundUser);
+
+                        return Ok(jsonUser);
+                    }
+                    else
+                    {
+                        return NotFound("User not found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error in GetUserById: " + ex.Message);
+                    return StatusCode(500, "Error retrieving user");
+                }
             }
         }
 
@@ -82,60 +117,102 @@ namespace API_Users_Management.Controllers
         [Route("users/{id}")]
         public IActionResult UpdateUser(int id, [FromBody] UpdatedUserDTO updatedUser)
         {
-            Parameter idParameter = new Parameter("p_Id_person", id.ToString());
-            Parameter typeParameter = new Parameter("p_Id_type", updatedUser.IdType.ToString());
-            Parameter nameParameter = new Parameter("p_Name", updatedUser.Name);
-            Parameter addressParameter = new Parameter("p_Address", updatedUser.Address);
-            Parameter mailParameter = new Parameter("p_Mail", updatedUser.Email);
-
-            List<Parameter> parameters = new List<Parameter>() 
-            { 
-                idParameter,
-                typeParameter,
-                nameParameter,
-                addressParameter,
-                mailParameter
-            };
-
-            bool updateSuccess = DbData.Update("UpdateUserById", parameters);
-
-            if (updateSuccess)
+            using (MySqlConnection connection = new MySqlConnection(connectionString))
             {
-                return Ok("User updated successfully");
-            }
-            else
-            {
-                return StatusCode(500, "Error updating user");
+                try
+                {
+                    connection.Open();
+
+                    string query = "UPDATE maxiusers.person SET ";
+                    List<string> updateValues = new List<string>();
+
+                    if (updatedUser.IdType != null)
+                        updateValues.Add($"type_user_Id_type_user = {updatedUser.IdType}");
+
+                    if (!string.IsNullOrEmpty(updatedUser.Name))
+                        updateValues.Add($"Name = '{updatedUser.Name}'");
+
+                    if (!string.IsNullOrEmpty(updatedUser.Address))
+                        updateValues.Add($"Address = '{updatedUser.Address}'");
+
+                    if (!string.IsNullOrEmpty(updatedUser.Email))
+                        updateValues.Add($"Mail = '{updatedUser.Email}'");
+
+                    if (!string.IsNullOrEmpty(updatedUser.UserName))
+                        updateValues.Add($"UserName = '{updatedUser.UserName}'");
+
+                    if (!string.IsNullOrEmpty(updatedUser.Password))
+                        updateValues.Add($"Password = '{updatedUser.Password}'");
+
+                    if (updatedUser.Age != null)
+                        updateValues.Add($"Age = '{updatedUser.Age:yyyy-MM-dd}'");
+
+                    if (updatedUser.Img != null)
+                    {
+                        // Convertir la imagen a su representaciÛn en cadena de bytes
+                        string imgBase64 = Convert.ToBase64String(updatedUser.Img);
+                        updateValues.Add($"Img = '{imgBase64}'");
+                    }
+
+                    string updateSet = string.Join(", ", updateValues);
+
+                    query += $"{updateSet} WHERE Id_person = {id}";
+
+                    MySqlCommand cmd = new MySqlCommand(query, connection);
+                    int rowsAffected = cmd.ExecuteNonQuery();
+
+                    if (rowsAffected > 0)
+                    {
+                        return Ok("User updated successfully");
+                    }
+                    else
+                    {
+                        return NotFound("User not found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error in UpdateUser: " + ex.Message);
+                    return StatusCode(500, "Error updating user");
+                }
             }
         }
-
 
         [HttpPost]
         [Route("users")]
         public IActionResult CreateUser([FromBody] NewUserDTO newUser)
         {
-            Parameter typeParameter = new Parameter("p_Id_type", newUser.Id_type.ToString());
-            Parameter nameParameter = new Parameter("p_Name", newUser.Name);
-            Parameter addressParameter = new Parameter("p_Address", newUser.Address);
-            Parameter mailParameter = new Parameter("p_Mail", newUser.Email);
-
-            List<Parameter> parameters = new List<Parameter>() 
-            { 
-                typeParameter,
-                nameParameter,
-                addressParameter,
-                mailParameter
-            };
-
-            bool creationSuccess = DbData.Create("CreateUser", parameters);
-
-            if (creationSuccess)
+            using (MySqlConnection connection = new MySqlConnection(connectionString))
             {
-                return Ok("User created successfully");
-            }
-            else
-            {
-                return StatusCode(500, "Error creating user");
+                try
+                {
+                    connection.Open();
+                    string query = $"INSERT INTO maxiusers.person (type_user_Id_type_user, Name, Address, Mail, UserName, Password, Age, Img) VALUES (@Id_type, @Name, @Address, @Email, @UserName, @Password, @Age, @Img)";
+                    MySqlCommand cmd = new MySqlCommand(query, connection);
+                    cmd.Parameters.AddWithValue("@Id_type", newUser.Id_type);
+                    cmd.Parameters.AddWithValue("@Name", newUser.Name);
+                    cmd.Parameters.AddWithValue("@Address", newUser.Address);
+                    cmd.Parameters.AddWithValue("@Email", newUser.Email);
+                    cmd.Parameters.AddWithValue("@UserName", newUser.UserName);
+                    cmd.Parameters.AddWithValue("@Password", newUser.Password);
+                    cmd.Parameters.AddWithValue("@Age", newUser.Age);
+                    cmd.Parameters.AddWithValue("@Img", newUser.Img); // AquÌ pasamos la imagen como bytes
+                    int rowsAffected = cmd.ExecuteNonQuery();
+
+                    if (rowsAffected > 0)
+                    {
+                        return Ok("User created successfully");
+                    }
+                    else
+                    {
+                        return StatusCode(500, "Error creating user");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error in CreateUser: " + ex.Message);
+                    return StatusCode(500, "Error creating user");
+                }
             }
         }
 
@@ -143,19 +220,32 @@ namespace API_Users_Management.Controllers
         [Route("users/{id}")]
         public IActionResult DeleteUser(int id)
         {
-            Parameter idParameter = new Parameter("p_Id_person", id.ToString());
-            List<Parameter> parameters = new List<Parameter>() { idParameter };
-
-            bool deletionSuccess = DbData.Delete("DeleteUserById", parameters);
-
-            if (deletionSuccess)
+            using (MySqlConnection connection = new MySqlConnection(connectionString))
             {
-                return Ok("User deleted successfully");
-            }
-            else
-            {
-                return StatusCode(500, "Error deleting user");
+                try
+                {
+                    connection.Open();
+                    string query = $"DELETE FROM maxiusers.person WHERE Id_person = {id}";
+                    MySqlCommand cmd = new MySqlCommand(query, connection);
+                    int rowsAffected = cmd.ExecuteNonQuery();
+
+                    if (rowsAffected > 0)
+                    {
+                        return Ok("User deleted successfully");
+                    }
+                    else
+                    {
+                        return NotFound("User not found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error in DeleteUser: " + ex.Message);
+                    return StatusCode(500, "Error deleting user");
+                }
             }
         }
     }
 }
+
+
